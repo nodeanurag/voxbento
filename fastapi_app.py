@@ -16,6 +16,7 @@ from portal.auth import require_admin
 from portal.config import settings
 from portal.routers.admin import router as admin_router
 from portal.routers.api import router as api_router
+from portal.routers.api_v1 import router as api_v1_router
 from portal.routers.auth import router as auth_router
 from portal.routers.demo import router as demo_router
 from portal.routers.developer import router as developer_router
@@ -23,6 +24,7 @@ from portal.routers.interpreter import router as interpreter_router
 from portal.routers.listener import router as listener_router
 from portal.routers.oauth import router as oauth_router
 from portal.routers.public import router as public_router
+from portal.routers.webhooks import router as webhooks_router
 from portal.websockets.handlers import router as ws_router
 
 "FastAPI entry point — sole backend for the Voxbento.\n\nStart with:\n    uvicorn fastapi_app:app --host 0.0.0.0 --port 8000 --reload\n"
@@ -57,11 +59,23 @@ async def lifespan(app: FastAPI):
 
     import asyncio
 
+    import portal.webhooks.worker as _webhook_worker_mod
+
+    # Reference via module attribute so test-time monkey-patching of
+    # portal.webhooks.worker.webhook_worker_loop is respected.
+    webhook_task = asyncio.create_task(_webhook_worker_mod.webhook_worker_loop())
+
     dg.track_task(asyncio.create_task(_gen()))
 
     logging.getLogger("uvicorn.access").addFilter(_UvicornTokenRedactor())
     logging.getLogger("uvicorn.access").addFilter(_HealthCheckFilter())
     yield
+    import contextlib
+
+    webhook_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await webhook_task
+
     if pg.shared_http_client:
         await pg.shared_http_client.aclose()
 
@@ -145,12 +159,14 @@ app.include_router(public_router)
 app.include_router(auth_router)
 app.include_router(developer_router)
 app.include_router(oauth_router)
+app.include_router(webhooks_router)
 
 app.include_router(interpreter_router)
 
 app.include_router(listener_router)
 
 app.include_router(api_router)
+app.include_router(api_v1_router)
 
 app.include_router(admin_router)
 

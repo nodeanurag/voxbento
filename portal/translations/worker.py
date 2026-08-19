@@ -199,7 +199,7 @@ class TranslationWorker:
                         segment_id=segment_id, language_code=lang_code, text=translated_text
                     )
                     local_session.add(translation)
-                    await local_session.commit()
+                    await local_session.flush()
 
                 # Broadcast Stage 1 (Text Ready) immediately with empty audio
                 await tts_manager.broadcast_bundle(room.id, lang_code, booth_id_str, b"", uuid_segment_id, seq, text, translated_text, None)

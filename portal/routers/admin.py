@@ -541,7 +541,7 @@ async def admin_regenerate_join_code(request: Request, event_id: int):
         if event is None:
             raise HTTPException(status_code=404, detail="Event not found.")
         event.listener_join_code = "".join((secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(6)))
-        await session.commit()
+        await session.flush()
     return safe_redirect(url=f"/admin/events/{event_id}/", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -653,7 +653,7 @@ async def admin_event_api_settings_post(
                 event.encrypted_groq_api_key = encrypt_val(groq_api_key.strip())
         except (ValueError, RuntimeError) as e:
             raise HTTPException(status_code=400, detail=f"API Key encryption failed: {e}")
-        await session.commit()
+        await session.flush()
     return safe_redirect(url=f"/admin/events/{event_id}/api-settings/", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -825,7 +825,7 @@ async def admin_edit_room(request: Request, event_id: int, room_id: int):
                 room.floor_tts_enabled = floor_tts_enabled
                 room.floor_tts_provider = floor_tts_provider
                 room.floor_tts_voice = floor_tts_voice
-            await session.commit()
+            await session.flush()
     return safe_redirect(url=f"/admin/events/{event_id}/rooms/{room_id}/", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -1324,7 +1324,7 @@ async def admin_booth_translation_settings(
         for code, lang_model in current_langs.items():
             if code not in translation_languages:
                 lang_model.enabled = False
-        await session.commit()
+        await session.flush()
     return safe_redirect(
         url=f"/admin/events/{event_id}/rooms/{room_id}/booths/{booth_id}/", status_code=status.HTTP_303_SEE_OTHER
     )
@@ -1345,7 +1345,7 @@ async def admin_edit_booth(request: Request, event_id: int, room_id: int, booth_
                     booth.language_code = validate_language_code(language_code_raw)
                 except ValueError:
                     pass
-        await session.commit()
+        await session.flush()
     return safe_redirect(
         url=str(request.url_for("admin_booth_detail", event_id=event_id, room_id=room_id, booth_id=booth_id)),
         status_code=status.HTTP_303_SEE_OTHER,
@@ -1393,7 +1393,7 @@ async def admin_transcription_settings(
         db_booth.transcription_enabled = bool(transcription_enabled)
         db_booth.transcription_provider = transcription_provider
         db_booth.transcription_model = transcription_model
-        await session.commit()
+        await session.flush()
         bid = make_booth_id(event.slug, db_booth.room_id, db_booth.language_code)
         state = booths.get_booth_sync(bid)
         is_live = state is not None and state.active_interpreter_id is not None
@@ -1495,7 +1495,7 @@ async def admin_toggle_user_admin(request: Request, user_id: int):
         if user:
             stmt = update(User).where(User.id == user_id).values(is_admin=not user.is_admin)
             await session.execute(stmt)
-            await session.commit()
+            await session.flush()
     return safe_redirect(url=f"/admin/users/{user_id}/", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -1763,7 +1763,7 @@ async def admin_developer_approve(
     account.status = "approved"
     account.reviewed_by = int(user["sub"])
     account.reviewed_at = datetime.now(timezone.utc)
-    await db.commit()
+    await db.flush()
 
     return RedirectResponse(url="/admin/developer-accounts", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -1789,6 +1789,6 @@ async def admin_developer_reject(
     account.status = "rejected"
     account.reviewed_by = int(user["sub"])
     account.reviewed_at = datetime.now(timezone.utc)
-    await db.commit()
+    await db.flush()
 
     return RedirectResponse(url="/admin/developer-accounts", status_code=status.HTTP_303_SEE_OTHER)

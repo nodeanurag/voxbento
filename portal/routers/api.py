@@ -200,7 +200,7 @@ async def create_event_booth(
             role="interpreter",
             label="API Provisioned",
         )
-        await session.commit()
+        await session.flush()
 
         state["interpreter_invite_url"] = f"{settings.public_base_url}/join/{invite.token}"
 
@@ -248,7 +248,7 @@ async def delete_event_booth(
 
         if booth:
             await session.delete(booth)
-            await session.commit()
+            await session.flush()
 
 
 @router.get("/events/{event_slug}/booths")

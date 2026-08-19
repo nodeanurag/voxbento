@@ -222,7 +222,7 @@ async def authorize_post(
             client_id=client.id, event_id=event_id, action="authorize", request_path="/oauth/authorize", status_code=303
         )
     )
-    await db.commit()
+    await db.flush()
 
     redirect_url = f"{redirect_uri}?code={code}&state={urllib.parse.quote(state)}"
     return RedirectResponse(url=redirect_url, status_code=303)
@@ -301,7 +301,7 @@ async def token_exchange(
                 status_code=200,
             )
         )
-        await db.commit()
+        await db.flush()
 
         return {
             "access_token": access_token_raw,
@@ -344,7 +344,7 @@ async def token_exchange(
                     status_code=400,
                 )
             )
-            await db.commit()
+            await db.flush()
             return JSONResponse(
                 status_code=400, content={"error": "invalid_grant", "error_description": "Token reuse detected"}
             )
@@ -377,7 +377,7 @@ async def token_exchange(
                 status_code=200,
             )
         )
-        await db.commit()
+        await db.flush()
 
         return {
             "access_token": new_access_token_raw,
@@ -429,6 +429,6 @@ async def revoke_token(
                 status_code=200,
             )
         )
-        await db.commit()
+        await db.flush()
 
     return JSONResponse(status_code=200, content={})

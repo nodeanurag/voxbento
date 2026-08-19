@@ -8,6 +8,15 @@
     <style>
       .create-panel { max-width: 600px; margin-top: 1rem; }
       .app-list { margin-top: 2rem; }
+      .secret-box {
+        background: #f1f5f9;
+        padding: 12px;
+        border-radius: 6px;
+        font-family: monospace;
+        word-break: break-all;
+        margin: 12px 0;
+        border: 1px solid #cbd5e1;
+      }
     </style>
   </head>
   <body>
@@ -73,7 +82,7 @@
       <div class="app-list">
         <div class="mission-header">
           <h2>Your Apps</h2>
-          <button class="btn btn-primary" disabled title="Phase 2 Feature">Create New App</button>
+          <button class="btn btn-primary" id="btn-create-app">Create New App</button>
         </div>
         
         {% if clients %}
@@ -103,5 +112,68 @@
       </div>
       {% endif %}
     </main>
+
+    <!-- Create App Modal -->
+    <div id="modal-create-app" class="custom-modal-overlay">
+      <div class="custom-modal">
+        <div class="custom-modal-header">
+          <span class="brand-text brand-text--modal">Create OAuth Client</span>
+        </div>
+        <form method="POST" action="/api/developer/clients">
+          <div class="custom-modal-body">
+            <div class="field">
+              <label for="app_name">App Name</label>
+              <input type="text" id="app_name" name="app_name" required placeholder="e.g. Eventyay Plugin" />
+            </div>
+            <div class="field" style="margin-top: 1rem;">
+              <label for="redirect_uris">Authorized Redirect URIs</label>
+              <input type="text" id="redirect_uris" name="redirect_uris" required placeholder="e.g. https://eventyay.com/callback" />
+              <span class="hint">Comma-separated list of strict exact-match redirect URLs.</span>
+            </div>
+          </div>
+          <div class="custom-modal-footer">
+            <button class="btn btn-outline" type="button" onclick="document.getElementById('modal-create-app').classList.remove('active');">Cancel</button>
+            <button class="btn btn-primary" type="submit">Create App</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {% if new_client %}
+    <!-- New Secret Modal -->
+    <div id="modal-new-secret" class="custom-modal-overlay active">
+      <div class="custom-modal" style="max-width: 500px;">
+        <div class="custom-modal-header">
+          <span class="brand-text brand-text--modal">App Created Successfully</span>
+        </div>
+        <div class="custom-modal-body">
+          <p>Your new OAuth Client <strong>{{ new_client.name }}</strong> has been created.</p>
+          <div style="margin-top: 1rem;">
+            <label style="font-size: 0.8rem; color: var(--color-text-secondary); font-weight: 500;">Client ID</label>
+            <div class="secret-box">{{ new_client.client_id }}</div>
+          </div>
+          <div style="margin-top: 1rem;">
+            <label style="font-size: 0.8rem; color: var(--color-text-secondary); font-weight: 500;">Client Secret</label>
+            <div class="secret-box" style="background: #fffbea; border-color: #fde047;">{{ new_secret }}</div>
+            <p class="hint" style="color: #b45309; font-weight: 500;">Please copy this secret and store it securely. You will not be able to see it again!</p>
+          </div>
+        </div>
+        <div class="custom-modal-footer">
+          <button class="btn btn-primary" type="button" onclick="document.getElementById('modal-new-secret').classList.remove('active');">I have copied my secret</button>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <script>
+      const btnCreate = document.getElementById('btn-create-app');
+      const modalCreate = document.getElementById('modal-create-app');
+      
+      if (btnCreate && modalCreate) {
+        btnCreate.addEventListener('click', () => {
+          modalCreate.classList.add('active');
+        });
+      }
+    </script>
   </body>
 </html>

@@ -807,7 +807,7 @@ async def save_transcript_segment(booth_id_str: str, text: str, room_id: int | N
 
             segment = TranscriptSegment(room_id=room_id, booth_id=booth_id, language_code=language_code, text=text)
             session.add(segment)
-            await session.commit()
+            await session.flush()
             return segment.id
     except Exception as e:
         logger.error(f"Failed to save transcript segment: {e}")

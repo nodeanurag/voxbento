@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
-from fastapi import HTTPException, Request, WebSocket, status
+from fastapi import Depends, HTTPException, Request, WebSocket, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from portal.config import settings
+from portal.database import get_db_session
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +124,11 @@ async def require_admin(request: Request) -> None:
                 if payload.get("is_admin"):
                     return
                 if payload.get("sub"):
-                    from portal.database import get_session, list_memberships_for_user, list_room_memberships_for_user
+                    from portal.database import (
+                        get_session,
+                        list_memberships_for_user,
+                        list_room_memberships_for_user,
+                    )
 
                     async with get_session() as db_session:
                         memberships = await list_memberships_for_user(db_session, int(payload["sub"]))
@@ -245,7 +252,11 @@ async def get_admin_flags(request: Request, event_id: int | None = None, room_id
                     flags["is_room_coordinator"] = True
                     return flags
                 if payload.get("sub"):
-                    from portal.database import get_session, list_memberships_for_user, list_room_memberships_for_user
+                    from portal.database import (
+                        get_session,
+                        list_memberships_for_user,
+                        list_room_memberships_for_user,
+                    )
 
                     async with get_session() as db_session:
                         memberships = await list_memberships_for_user(db_session, int(payload["sub"]))
@@ -559,3 +570,48 @@ def can_perform_role(granted_role: str | None, requested_role: str) -> bool:
     if granted_role is None:
         return False
     return _ROLE_RANK.get(granted_role, -1) >= _ROLE_RANK.get(requested_role, 0)
+
+
+oauth2_bearer = HTTPBearer(auto_error=False)
+
+
+def require_oauth_scope(required_scope: str):
+    async def dependency(
+        request: Request,
+        db: AsyncSession = Depends(get_db_session),
+        token: HTTPAuthorizationCredentials | None = Depends(oauth2_bearer),
+    ):
+        if not token:
+            raise HTTPException(status_code=401, detail="Missing Bearer Token")
+
+        from datetime import datetime, timezone
+
+        from sqlalchemy import select
+
+        from portal.models import OAuthToken
+
+        token_hash = hashlib.sha256(token.credentials.encode()).hexdigest()
+        result = await db.execute(select(OAuthToken).where(OAuthToken.access_token_hash == token_hash))
+        oauth_token = result.scalars().first()
+
+        if not oauth_token:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        if oauth_token.revoked:
+            raise HTTPException(status_code=401, detail="Token revoked")
+
+        # SQLAlchemy with SQLite might return naive datetimes for expires_at
+        expires_at_aware = oauth_token.expires_at.replace(tzinfo=timezone.utc) if oauth_token.expires_at.tzinfo is None else oauth_token.expires_at
+        if expires_at_aware < datetime.now(timezone.utc):
+            raise HTTPException(status_code=401, detail="Token expired")
+
+        if required_scope not in oauth_token.scopes:
+            raise HTTPException(status_code=403, detail=f"Token missing required scope: {required_scope}")
+
+        # Optional: Update last_used_at
+        # oauth_token.last_used_at = datetime.now(timezone.utc)
+        # await db.commit()
+
+        return oauth_token
+
+    return dependency
